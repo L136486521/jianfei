@@ -31,8 +31,11 @@ jobs:
           openjdk-11-jdk \
           zlib1g-dev
         
-    - name: Install Buildozer
+    - name: Install Buildozer and Cython
       run: |
+        # 先安装 Cython，这是 Buildozer 的依赖
+        pip install cython==0.29.33
+        # 再安装 Buildozer
         pip install buildozer
         echo "$(python -m site --user-base)/bin" >> $GITHUB_PATH
         
@@ -71,7 +74,7 @@ jobs:
       run: |
         echo "开始构建APK..."
         
-        # 直接构建APK，跳过不存在的check命令
+        # 直接构建APK
         buildozer -v android debug
       continue-on-error: true
       
