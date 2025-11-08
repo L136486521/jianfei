@@ -12,21 +12,21 @@ package.domain = org.jianfei
 source.dir = .
 
 # 包含的文件扩展名
-source.include_exts = py,png,jpg,kv,atlas,ttf,db
+source.include_exts = py,png,jpg,kv,atlas,ttf
 
 # 主程序文件
 main = main.py
 
-# 版本信息（简化版本，避免冲突）
+# 版本信息（简化版本）
 version = 2.0
 
-# 依赖包（使用固定版本避免兼容性问题）
-requirements = python3,kivy==2.1.0,kivymd==1.1.1,peewee,openssl,requests,sqlite3
+# 依赖包（使用较新的版本）
+requirements = python3,kivy==2.3.0,kivymd==1.2.0,peewee
 
 # Android API 配置
-android.api = 30
+android.api = 33
 android.minapi = 21
-android.targetapi = 30
+android.targetapi = 33
 
 # 引导程序
 bootstraps = sdl2
@@ -49,9 +49,6 @@ fullscreen = 0
 # 窗口可调整大小
 window.resizable = 0
 
-# 包含数据文件
-include.data = fonts/simkai.ttf
-
 # 排除测试文件和虚拟环境
 source.exclude_dirs = tests, bin, venv, __pycache__
 
@@ -61,9 +58,6 @@ source.exclude_exts = spec, pyc, pyo, so, o, a, class, keystore
 [buildozer]
 # 日志级别
 log_level = 2
-
-# 警告设置
-warn_on_root = 1
 
 # 构建目录
 build_dir = .buildozer
