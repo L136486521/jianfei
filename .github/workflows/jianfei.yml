@@ -36,6 +36,20 @@ jobs:
         pip install buildozer
         echo "$(python -m site --user-base)/bin" >> $GITHUB_PATH
         
+    - name: Fix buildozer.spec configuration
+      run: |
+        echo "修复 buildozer.spec 配置..."
+        # 备份原文件
+        cp buildozer.spec buildozer.spec.backup
+        
+        # 移除冲突的版本配置 - 只保留简单的版本号
+        # 删除 version.regex 和 version.filename 行
+        sed -i '/version.regex/d' buildozer.spec
+        sed -i '/version.filename/d' buildozer.spec
+        
+        echo "修复后的 buildozer.spec 相关内容:"
+        grep -A2 -B2 "version" buildozer.spec || echo "没有找到version相关配置"
+        
     - name: Verify required files exist
       run: |
         echo "检查必要文件..."
@@ -52,8 +66,12 @@ jobs:
         
     - name: Build APK with Buildozer
       run: |
-        # 接受所有SDK许可证
-        yes | buildozer android debug 2>/dev/null || buildozer -v android debug
+        # 先检查配置
+        buildozer check
+        echo "配置检查完成，开始构建..."
+        
+        # 构建APK
+        buildozer -v android debug
       continue-on-error: true
       
     - name: Check if APK exists
@@ -67,6 +85,8 @@ jobs:
         else
           echo "apk_exists=false" >> $GITHUB_OUTPUT
           echo "未找到APK文件"
+          echo "检查构建日志..."
+          find .buildozer -name "*.log" -exec echo "=== {} ===" \; -exec head -50 {} \; 2>/dev/null || echo "没有找到日志文件"
         fi
         
     - name: Upload APK artifact
@@ -90,6 +110,8 @@ jobs:
       run: |
         if [ "${{ steps.check_apk.outputs.apk_exists }}" = "true" ]; then
           echo "🎉 APK构建成功！"
+          echo "📱 可在Artifacts中下载APK文件"
         else
           echo "💥 APK构建失败"
+          echo "🔍 请查看构建日志了解详细错误信息"
         fi
