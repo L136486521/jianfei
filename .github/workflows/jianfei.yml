@@ -13,56 +13,6 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.9'
-        
-    - name: Install complete build dependencies
-      run: |
-        sudo apt-get update
-        # 安装完整的构建工具链，包括 autoconf, automake 和 libtool
-        sudo apt-get install -y \
-          python3-pip \
-          build-essential \
-          git \
-          zip \
-          unzip \
-          openjdk-11-jdk \
-          zlib1g-dev \
-          autoconf \
-          automake \
-          libtool \
-          pkg-config \
-          cmake \
-          libffi-dev \
-          libssl-dev
-        
-    - name: Install Buildozer and Cython
-      run: |
-        # 先安装 Cython，这是 Buildozer 的依赖
-        pip install cython==0.29.33
-        # 再安装 Buildozer
-        pip install buildozer
-        echo "$(python -m site --user-base)/bin" >> $GITHUB_PATH
-        
-    - name: Fix buildozer.spec configuration
-      run: |
-        echo "修复 buildozer.spec 配置冲突..."
-        echo "原始文件内容预览:"
-        head -30 buildozer.spec
-        
-        # 备份原文件
-        cp buildozer.spec buildozer.spec.backup
-        
-        # 移除冲突的版本配置 - 只保留简单的版本号
-        # 删除 version.regex 和 version.filename 行
-        sed -i '/version.regex/d' buildozer.spec
-        sed -i '/version.filename/d' buildozer.spec
-        
-        echo "修复后的 buildozer.spec 相关内容:"
-        grep -A2 -B2 "version" buildozer.spec || echo "没有找到version相关配置"
-        
     - name: Verify required files exist
       run: |
         echo "检查必要文件..."
@@ -77,32 +27,15 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Accept Android SDK licenses
+    - name: Build APK using Buildozer Docker
       run: |
-        mkdir -p ~/.android
-        echo "### 接受 Android SDK 许可证 ###"
-        # 创建 licenses 目录
-        mkdir -p ~/.android/licenses
-        # 预先接受所有必要的许可证
-        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > ~/.android/licenses/android-sdk-license
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
+        echo "使用 Buildozer Docker 镜像构建 APK..."
         
-    - name: Build APK with Buildozer
-      run: |
-        echo "开始构建APK..."
-        
-        # 设置环境变量以接受所有许可证
-        export BUILDODER_ALLOW_SUDO=1
-        export CI=true
-        
-        # 清理之前的构建
-        buildozer android clean || true
-        
-        # 让 Buildozer 自动下载和管理 Android SDK
-        # 使用 yes 命令自动接受所有许可证提示
-        yes | buildozer -v android debug
+        # 使用官方 Buildozer Docker 镜像，所有依赖都已预装
+        docker run --rm \
+          --volume "$(pwd)":/home/user/hostcwd \
+          --workdir /home/user/hostcwd \
+          buildozer/buildozer -v android debug
       continue-on-error: true
       
     - name: Check if APK exists
@@ -116,8 +49,10 @@ jobs:
         else
           echo "apk_exists=false" >> $GITHUB_OUTPUT
           echo "未找到APK文件"
-          echo "检查构建日志..."
-          find .buildozer -name "*.log" -exec echo "=== {} ===" \; -exec head -50 {} \; 2>/dev/null || echo "没有找到日志文件"
+          echo "当前目录内容:"
+          ls -la
+          echo "bin目录内容:"
+          ls -la bin/ 2>/dev/null || echo "bin目录不存在"
         fi
         
     - name: Upload APK artifact
