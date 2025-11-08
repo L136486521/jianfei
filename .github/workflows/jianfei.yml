@@ -13,6 +13,79 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Set up Python and dependencies
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-pip \
+          build-essential \
+          git \
+          zip \
+          unzip \
+          openjdk-11-jdk \
+          zlib1g-dev \
+          autoconf \
+          automake \
+          libtool \
+          libtool-bin \
+          pkg-config \
+          cmake \
+          libffi-dev \
+          libssl-dev \
+          wget \
+          curl
+        
+    - name: Install Buildozer and requirements
+      run: |
+        pip install buildozer
+        pip install cython==0.29.33
+        pip install kivy==2.1.0 kivymd==1.1.1 peewee
+        
+    - name: Fix buildozer.spec configuration
+      run: |
+        echo "优化 buildozer.spec 配置..."
+        # 备份原文件
+        cp buildozer.spec buildozer.spec.backup
+        
+        # 创建优化的 buildozer.spec
+        cat > buildozer.spec << 'EOF'
+[app]
+title = 减肥数据记录
+package.name = jianfei
+package.domain = org.jianfei
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas,ttf
+main = main.py
+version = 2.0
+requirements = python3,kivy==2.1.0,kivymd==1.1.1,peewee,openssl,requests,sqlite3
+android.api = 30
+android.minapi = 21
+android.targetapi = 30
+android.ndk = 25b
+android.sdk = 28
+bootstraps = sdl2
+android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+icon.filename = data/icon.png
+source.include_patterns = fonts/*.ttf
+orientation = portrait
+fullscreen = 0
+window.resizable = 0
+android.arch = armeabi-v7a
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
+build_dir = .buildozer
+bin_dir = bin
+default_target = android
+android.accept_sdk_license = True
+EOF
+        
     - name: Verify required files exist
       run: |
         echo "检查必要文件..."
@@ -27,136 +100,53 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Build APK with path fix
+    - name: Accept Android SDK licenses
       run: |
-        echo "修复路径问题并构建 APK..."
+        mkdir -p ~/.android
+        mkdir -p ~/.android/licenses
+        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
+        echo "Android SDK 许可证已接受"
         
-        # 使用 Ubuntu 22.04 并修复路径问题
-        docker run --rm \
-          --volume "$(pwd)":/home/user/hostcwd \
-          --workdir /home/user/hostcwd \
-          --env DEBIAN_FRONTEND=noninteractive \
-          ubuntu:22.04 /bin/bash -c "
-            # 首先更新包列表并安装基础工具
-            apt-get update && apt-get install -y --no-install-recommends \
-              ca-certificates \
-              curl \
-              gnupg \
-              lsb-release \
-              sudo
-            
-            # 添加官方 Ubuntu 软件源
-            echo 'deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse' > /etc/apt/sources.list
-            echo 'deb http://archive.ubuntu.com/ubuntu jammy-updates main restricted universe multiverse' >> /etc/apt/sources.list
-            echo 'deb http://archive.ubuntu.com/ubuntu jammy-security main restricted universe multiverse' >> /etc/apt/sources.list
-            
-            # 再次更新包列表
-            apt-get update
-            
-            # 安装所有必要的包，包括完整的 libtool 和 autoconf 套件
-            apt-get install -y --no-install-recommends \
-              python3 \
-              python3-pip \
-              build-essential \
-              git \
-              zip \
-              unzip \
-              openjdk-11-jdk \
-              zlib1g-dev \
-              autoconf \
-              automake \
-              libtool \
-              libtool-bin \
-              pkg-config \
-              cmake \
-              libffi-dev \
-              libssl-dev \
-              wget
-            
-            # 清理缓存
-            apt-get clean && rm -rf /var/lib/apt/lists/*
-
-            # 设置 JAVA_HOME 环境变量
-            export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-            export PATH=\$JAVA_HOME/bin:\$PATH
-
-            # 安装 Buildozer 和依赖（全局安装）
-            python3 -m pip install --upgrade pip
-            python3 -m pip install buildozer cython==0.29.33
-
-            # 接受 Android SDK 许可证
-            mkdir -p /root/.android
-            mkdir -p /root/.android/licenses
-            echo '8933bad161af4178b1185d1a37fbf41ea5269c55' > /root/.android/licenses/android-sdk-license
-            echo '84831b9409646a918e30573bab4c9c91346d8abd' > /root/.android/licenses/android-sdk-preview-license
-
-            # 修复 buildozer.spec 配置
-            echo '修复 buildozer.spec 配置...'
-            
-            # 备份原文件
-            cp buildozer.spec buildozer.spec.backup
-            
-            # 移除冲突的版本配置
-            sed -i '/version.regex/d' buildozer.spec
-            sed -i '/version.filename/d' buildozer.spec
-            
-            # 使用更稳定的依赖版本
-            sed -i 's/kivy==2.3.0/kivy==2.1.0/g' buildozer.spec
-            sed -i 's/kivymd==1.2.0/kivymd==1.1.1/g' buildozer.spec
-            
-            # 添加必要的配置
-            if ! grep -q 'android.arch' buildozer.spec; then
-              echo 'android.arch = armeabi-v7a' >> buildozer.spec
-            fi
-            
-            # 显示修复后的配置
-            echo '修复后的 buildozer.spec 相关内容:'
-            grep -E '(version|requirements|android\.)' buildozer.spec || echo '没有找到相关配置'
-
-            # 创建非root用户并设置权限
-            useradd -m -s /bin/bash builder
-            echo 'builder ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
-            chown -R builder:builder /home/user/hostcwd
-            
-            # 切换到非root用户进行构建，使用完整路径
-            su - builder -c '
-              cd /home/user/hostcwd
-              export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
-              export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-              export PATH=\$JAVA_HOME/bin:\$PATH
-              
-              # 接受Android SDK许可证（用户目录）
-              mkdir -p ~/.android/licenses
-              echo \"8933bad161af4178b1185d1a37fbf41ea5269c55\" > ~/.android/licenses/android-sdk-license
-              echo \"84831b9409646a918e30573bab4c9c91346d8abd\" > ~/.android/licenses/android-sdk-preview-license
-              
-              # 开始构建 - 使用全局安装的buildozer
-              echo \"开始构建 APK...\"
-              /usr/local/bin/buildozer -v android debug
-            '
-          "
+    - name: Build APK with Buildozer
+      run: |
+        echo "开始构建 APK..."
+        
+        # 设置环境变量
+        export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
+        export PATH=$JAVA_HOME/bin:$PATH
+        
+        # 清理之前的构建
+        buildozer android clean || true
+        
+        # 开始构建 - 使用超时和重试机制
+        timeout 1800 buildozer -v android debug || \
+        (echo "第一次构建超时，尝试重新构建..." && \
+         buildozer android clean && \
+         timeout 2400 buildozer -v android debug)
       continue-on-error: true
       
     - name: Check if APK exists
       id: check_apk
       run: |
-        if find bin/ -name "*.apk" | grep -q .; then
+        if find bin/ -name "*.apk" 2>/dev/null | grep -q .; then
           echo "apk_exists=true" >> $GITHUB_OUTPUT
           APK_FILE=$(find bin/ -name "*.apk" | head -1)
           echo "APK文件找到: $APK_FILE"
           echo "APK文件大小: $(du -h "$APK_FILE" | cut -f1)"
-          echo "APK详细信息:"
-          file "$APK_FILE"
-          echo "🎉 恭喜！APK构建成功！"
+          echo "🎉 APK构建成功！"
         else
           echo "apk_exists=false" >> $GITHUB_OUTPUT
           echo "未找到APK文件"
-          echo "当前目录内容:"
-          ls -la
-          echo "bin目录内容:"
-          ls -la bin/ 2>/dev/null || echo "bin目录不存在"
-          echo "构建日志:"
-          find .buildozer -name "*.log" -exec echo "=== {} ===" \; -exec tail -50 {} \; 2>/dev/null || echo "没有找到日志文件"
+          echo "检查构建状态..."
+          if [ -d ".buildozer" ]; then
+            echo "构建目录存在，检查日志..."
+            find .buildozer -name "*.log" -exec echo "=== {} ===" \; -exec tail -20 {} \; 2>/dev/null | head -100 || echo "无日志文件"
+          else
+            echo "构建目录不存在"
+          fi
         fi
         
     - name: Upload APK artifact
@@ -168,23 +158,22 @@ jobs:
         retention-days: 30
         
     - name: Upload build logs
+      if: steps.check_apk.outputs.apk_exists == 'false'
       uses: actions/upload-artifact@v4
       with:
         name: build-logs
         path: |
           .buildozer/
-          bin/
         retention-days: 30
         
     - name: Final status report
       run: |
         if [ "${{ steps.check_apk.outputs.apk_exists }}" = "true" ]; then
-          echo "🎉 APK构建成功！"
+          echo "🎉 恭喜！APK构建成功！"
           echo "📱 可在Artifacts中下载APK文件"
           echo "✅ 所有问题已解决！"
-          echo "🚀 恭喜您成功构建Android应用！"
         else
           echo "💥 APK构建失败"
           echo "🔍 请查看构建日志了解详细错误信息"
-          echo "🔄 我们会继续优化配置..."
+          echo "💡 建议：尝试在本地环境中使用相同配置构建"
         fi
