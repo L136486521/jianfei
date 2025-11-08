@@ -27,15 +27,49 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Build APK using Buildozer Docker
+    - name: Build APK using custom Docker
       run: |
-        echo "使用 Buildozer Docker 镜像构建 APK..."
+        echo "使用自定义 Docker 环境构建 APK..."
         
-        # 使用可用的 Buildozer Docker 镜像
+        # 创建自定义 Dockerfile
+        cat > Dockerfile << 'EOF'
+FROM ubuntu:20.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+RUN apt-get update && apt-get install -y \
+    python3 \
+    python3-pip \
+    build-essential \
+    git \
+    zip \
+    unzip \
+    openjdk-11-jdk \
+    zlib1g-dev \
+    autoconf \
+    automake \
+    libtool \
+    pkg-config \
+    cmake \
+    libffi-dev \
+    libssl-dev \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+RUN pip3 install --upgrade pip
+RUN pip3 install buildozer cython==0.29.33
+
+WORKDIR /app
+EOF
+        
+        # 构建自定义镜像
+        docker build -t buildozer-custom .
+        
+        # 使用自定义镜像构建 APK
         docker run --rm \
-          --volume "$(pwd)":/home/user/hostcwd \
-          --workdir /home/user/hostcwd \
-          kivy/buildozer -v android debug
+          --volume "$(pwd)":/app \
+          buildozer-custom \
+          buildozer -v android debug
       continue-on-error: true
       
     - name: Check if APK exists
