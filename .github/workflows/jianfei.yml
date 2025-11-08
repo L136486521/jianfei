@@ -31,11 +31,11 @@ jobs:
       run: |
         echo "使用 Buildozer Docker 镜像构建 APK..."
         
-        # 使用官方 Buildozer Docker 镜像，所有依赖都已预装
+        # 使用可用的 Buildozer Docker 镜像
         docker run --rm \
           --volume "$(pwd)":/home/user/hostcwd \
           --workdir /home/user/hostcwd \
-          buildozer/buildozer -v android debug
+          kivy/buildozer -v android debug
       continue-on-error: true
       
     - name: Check if APK exists
