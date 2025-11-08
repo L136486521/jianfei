@@ -46,50 +46,16 @@ jobs:
         pip install --user cython
         echo "$(python -m site --user-base)/bin" >> $GITHUB_PATH
         
-    - name: Install Python dependencies
+    - name: Verify required files exist
       run: |
-        pip install kivy kivymd peewee
+        echo "检查必要文件..."
+        if [ -f "buildozer.spec" ]; then
+          echo "✅ buildozer.spec 文件存在"
+        else
+          echo "❌ buildozer.spec 文件不存在"
+          exit 1
+        fi
         
-    - name: Create buildozer.spec file
-      run: |
-        buildozer init
-        # 修改 buildozer.spec 配置
-        cat > buildozer.spec << 'EOF'
-[app]
-title = 减肥数据记录
-package.name = jianfei
-package.domain = org.jianfei
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,ttf,db
-main = main.py
-version = 2.0
-version.regex = __version__ = ['"](.*)['"]
-version.filename = %(source.dir)s/main.py
-requirements = python3,kivy==2.1.0,kivymd==1.1.1,peewee,openssl,requests,sqlite3
-android.api = 30
-android.minapi = 21
-android.targetapi = 30
-bootstraps = sdl2
-android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
-icon.filename = %(source.dir)s/data/icon.png
-log_level = 2
-source.include_patterns = fonts/*.ttf
-orientation = portrait
-fullscreen = 0
-window.resizable = 0
-
-[buildozer]
-log_level = 2
-warn_on_root = 1
-build_dir = .buildozer
-bin_dir = bin
-default_target = android
-android.accept_sdk_license = True
-EOF
-        
-    - name: Verify resource files exist
-      run: |
-        echo "检查资源文件..."
         if [ -f "fonts/simkai.ttf" ]; then
           echo "✅ 字体文件存在: fonts/simkai.ttf"
         else
@@ -104,6 +70,15 @@ EOF
           exit 1
         fi
         
+        if [ -f "main.py" ]; then
+          echo "✅ 主程序文件存在: main.py"
+        else
+          echo "❌ 主程序文件不存在: main.py"
+          exit 1
+        fi
+        
+        echo "所有必要文件检查通过！"
+        
     - name: Build APK with Buildozer
       run: |
         buildozer -v android debug
@@ -114,11 +89,15 @@ EOF
       run: |
         if ls bin/*.apk 1> /dev/null 2>&1; then
           echo "apk_exists=true" >> $GITHUB_OUTPUT
-          echo "APK文件找到: $(ls bin/*.apk)"
-          echo "APK文件大小: $(du -h bin/*.apk | cut -f1)"
+          APK_FILE=$(ls bin/*.apk)
+          echo "APK文件找到: $APK_FILE"
+          echo "APK文件大小: $(du -h $APK_FILE | cut -f1)"
         else
           echo "apk_exists=false" >> $GITHUB_OUTPUT
-          echo "未找到APK文件，检查构建目录:"
+          echo "未找到APK文件"
+          # 检查构建目录内容
+          echo "构建目录内容:"
+          ls -la .buildozer/ || echo ".buildozer目录不存在"
           ls -la bin/ || echo "bin目录不存在"
         fi
         
@@ -129,34 +108,34 @@ EOF
         name: jianfei-app-apk
         path: bin/*.apk
         retention-days: 30
-        if-no-files-found: error
         
-    - name: Create placeholder if no APK
+    - name: Create build info file
       if: steps.check_apk.outputs.apk_exists == 'false'
       run: |
-        echo "创建占位文件说明情况"
         mkdir -p bin
-        echo "构建过程中未生成APK文件" > bin/BUILD_FAILED.txt
-        echo "请检查GitHub Actions日志了解详细错误信息" >> bin/BUILD_FAILED.txt
-        date >> bin/BUILD_FAILED.txt
+        echo "构建信息" > bin/build_info.txt
+        echo "==========" >> bin/build_info.txt
+        echo "构建时间: $(date)" >> bin/build_info.txt
+        echo "构建状态: 失败 - 未生成APK文件" >> bin/build_info.txt
+        echo "请检查GitHub Actions日志了解详细错误信息" >> bin/build_info.txt
         
-    - name: Upload all build files and logs
+    - name: Upload build logs and info
       uses: actions/upload-artifact@v3
       with:
-        name: build-files-and-logs
+        name: build-logs
         path: |
           .buildozer/
-          buildozer.spec
           bin/
         retention-days: 30
-        if-no-files-found: warn
         
-    - name: Final build status
+    - name: Final status report
       run: |
         if [ "${{ steps.check_apk.outputs.apk_exists }}" = "true" ]; then
-          echo "🎉 APK构建成功！可在Artifacts中下载"
-          echo "APK文件: $(ls bin/*.apk)"
+          echo "🎉 APK构建成功！"
+          echo "📱 可在Artifacts中下载APK文件"
+          echo "📊 构建完成时间: $(date)"
         else
-          echo "💥 APK构建失败，请检查上方日志"
-          # 这里不退出，让工作流完成上传日志
+          echo "💥 APK构建失败"
+          echo "🔍 请查看构建日志了解详细错误信息"
+          echo "⏰ 构建失败时间: $(date)"
         fi
