@@ -18,10 +18,10 @@ jobs:
       with:
         python-version: '3.9'
         
-    - name: Install basic dependencies
+    - name: Install complete build dependencies
       run: |
         sudo apt-get update
-        # 只安装最基础的包
+        # 安装完整的构建工具链，包括 autoconf, automake 和 libtool
         sudo apt-get install -y \
           python3-pip \
           build-essential \
@@ -29,7 +29,14 @@ jobs:
           zip \
           unzip \
           openjdk-11-jdk \
-          zlib1g-dev
+          zlib1g-dev \
+          autoconf \
+          automake \
+          libtool \
+          pkg-config \
+          cmake \
+          libffi-dev \
+          libssl-dev
         
     - name: Install Buildozer and Cython
       run: |
@@ -90,8 +97,11 @@ jobs:
         export BUILDODER_ALLOW_SUDO=1
         export CI=true
         
+        # 清理之前的构建
+        buildozer android clean || true
+        
         # 让 Buildozer 自动下载和管理 Android SDK
-        # 使用 yes 命令自动接受所有许可证
+        # 使用 yes 命令自动接受所有许可证提示
         yes | buildozer -v android debug
       continue-on-error: true
       
