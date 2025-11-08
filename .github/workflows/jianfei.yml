@@ -27,11 +27,11 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Build APK with complete fix
+    - name: Build APK with path fix
       run: |
-        echo "使用完整修复方案构建 APK..."
+        echo "修复路径问题并构建 APK..."
         
-        # 使用 Ubuntu 22.04 并完整修复所有问题
+        # 使用 Ubuntu 22.04 并修复路径问题
         docker run --rm \
           --volume "$(pwd)":/home/user/hostcwd \
           --workdir /home/user/hostcwd \
@@ -42,7 +42,8 @@ jobs:
               ca-certificates \
               curl \
               gnupg \
-              lsb-release
+              lsb-release \
+              sudo
             
             # 添加官方 Ubuntu 软件源
             echo 'deb http://archive.ubuntu.com/ubuntu jammy main restricted universe multiverse' > /etc/apt/sources.list
@@ -65,7 +66,7 @@ jobs:
               autoconf \
               automake \
               libtool \
-              libtool-bin \  # 关键修复：安装 libtool-bin
+              libtool-bin \
               pkg-config \
               cmake \
               libffi-dev \
@@ -79,7 +80,7 @@ jobs:
             export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
             export PATH=\$JAVA_HOME/bin:\$PATH
 
-            # 安装 Buildozer 和依赖
+            # 安装 Buildozer 和依赖（全局安装）
             python3 -m pip install --upgrade pip
             python3 -m pip install buildozer cython==0.29.33
 
@@ -112,28 +113,26 @@ jobs:
             echo '修复后的 buildozer.spec 相关内容:'
             grep -E '(version|requirements|android\.)' buildozer.spec || echo '没有找到相关配置'
 
-            # 创建非root用户并切换（避免root确认问题）
+            # 创建非root用户并设置权限
             useradd -m -s /bin/bash builder
+            echo 'builder ALL=(ALL) NOPASSWD:ALL' >> /etc/sudoers
             chown -R builder:builder /home/user/hostcwd
             
-            # 切换到非root用户进行构建
+            # 切换到非root用户进行构建，使用完整路径
             su - builder -c '
               cd /home/user/hostcwd
-              export PATH=\$PATH:/home/builder/.local/bin
+              export PATH=/usr/local/bin:/usr/bin:/bin:/usr/local/games:/usr/games
               export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
               export PATH=\$JAVA_HOME/bin:\$PATH
-              
-              # 安装buildozer到用户目录
-              python3 -m pip install --user buildozer
               
               # 接受Android SDK许可证（用户目录）
               mkdir -p ~/.android/licenses
               echo \"8933bad161af4178b1185d1a37fbf41ea5269c55\" > ~/.android/licenses/android-sdk-license
               echo \"84831b9409646a918e30573bab4c9c91346d8abd\" > ~/.android/licenses/android-sdk-preview-license
               
-              # 开始构建
+              # 开始构建 - 使用全局安装的buildozer
               echo \"开始构建 APK...\"
-              ~/.local/bin/buildozer -v android debug
+              /usr/local/bin/buildozer -v android debug
             '
           "
       continue-on-error: true
