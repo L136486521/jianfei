@@ -18,10 +18,10 @@ jobs:
       with:
         python-version: '3.9'
         
-    - name: Install Android SDK and build tools
+    - name: Install basic dependencies
       run: |
         sudo apt-get update
-        # 安装基础构建工具和Android SDK
+        # 只安装最基础的包
         sudo apt-get install -y \
           python3-pip \
           build-essential \
@@ -29,18 +29,7 @@ jobs:
           zip \
           unzip \
           openjdk-11-jdk \
-          zlib1g-dev \
-          wget
-        
-        # 安装 Android SDK 命令行工具
-        wget https://dl.google.com/android/repository/commandlinetools-linux-8512546_latest.zip
-        mkdir -p android-sdk
-        unzip commandlinetools-linux-8512546_latest.zip -d android-sdk
-        rm commandlinetools-linux-8512546_latest.zip
-        
-        # 设置环境变量
-        echo "ANDROID_HOME=$PWD/android-sdk" >> $GITHUB_ENV
-        echo "PATH=$PWD/android-sdk/cmdline-tools/bin:$PATH" >> $GITHUB_ENV
+          zlib1g-dev
         
     - name: Install Buildozer and Cython
       run: |
@@ -81,16 +70,29 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
+    - name: Accept Android SDK licenses
+      run: |
+        mkdir -p ~/.android
+        echo "### 接受 Android SDK 许可证 ###"
+        # 创建 licenses 目录
+        mkdir -p ~/.android/licenses
+        # 预先接受所有必要的许可证
+        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
+        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" > ~/.android/licenses/android-sdk-license
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
+        
     - name: Build APK with Buildozer
       run: |
         echo "开始构建APK..."
         
-        # 设置 Buildozer 使用系统 Android SDK
-        export ANDROIDSDK="$ANDROID_HOME"
-        export ANDROIDNDK="$ANDROID_HOME/ndk"
+        # 设置环境变量以接受所有许可证
+        export BUILDODER_ALLOW_SUDO=1
+        export CI=true
         
-        # 直接构建APK
-        buildozer -v android debug
+        # 让 Buildozer 自动下载和管理 Android SDK
+        # 使用 yes 命令自动接受所有许可证
+        yes | buildozer -v android debug
       continue-on-error: true
       
     - name: Check if APK exists
