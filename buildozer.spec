@@ -17,14 +17,10 @@ source.include_exts = py,png,jpg,kv,atlas,ttf,db
 # 主程序文件
 main = main.py
 
-# 版本信息
+# 版本信息（简化版本，避免冲突）
 version = 2.0
 
-# 版本号匹配规则
-version.regex = __version__ = ['"](.*)['"]
-version.filename = %(source.dir)s/main.py
-
-# 依赖包
+# 依赖包（使用固定版本避免兼容性问题）
 requirements = python3,kivy==2.1.0,kivymd==1.1.1,peewee,openssl,requests,sqlite3
 
 # Android API 配置
@@ -38,11 +34,8 @@ bootstraps = sdl2
 # Android 权限
 android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 
-# 应用图标路径（使用您现有的图标）
-icon.filename = %(source.dir)s/data/icon.png
-
-# 日志级别
-log_level = 2
+# 应用图标路径
+icon.filename = data/icon.png
 
 # 包含字体文件
 source.include_patterns = fonts/*.ttf
@@ -63,9 +56,7 @@ include.data = fonts/simkai.ttf
 source.exclude_dirs = tests, bin, venv, __pycache__
 
 # 排除常见的无关文件
-source.exclude_exts = spec, pyc, pyo, so, o, a, db, class, keystore
-
-# 应用配置结束
+source.exclude_exts = spec, pyc, pyo, so, o, a, class, keystore
 
 [buildozer]
 # 日志级别
@@ -85,5 +76,3 @@ default_target = android
 
 # 自动接受SDK许可证
 android.accept_sdk_license = True
-
-# 构建配置结束
