@@ -27,46 +27,28 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Build APK using pre-configured Docker
+    - name: Build APK using Kivy Android Docker
       run: |
-        echo "使用预配置的 Docker 环境构建 APK..."
+        echo "使用 Kivy Android Docker 环境构建 APK..."
         
-        # 使用一个已知可用的、预配置了 Android SDK 的镜像
-        # 这个镜像是从 Ubuntu 20.04 基础镜像构建的，包含了完整的 Android 构建环境
+        # 使用专门为 Kivy Android 构建配置的 Docker 镜像
         docker run --rm \
           --volume "$(pwd)":/home/user/hostcwd \
           --workdir /home/user/hostcwd \
-          --env DEBIAN_FRONTEND=noninteractive \
-          ubuntu:20.04 /bin/bash -c "
-            # 更新并安装必要工具
-            apt-get update && apt-get install -y \
-              python3 \
-              python3-pip \
-              build-essential \
-              git \
-              zip \
-              unzip \
-              openjdk-8-jdk \
-              zlib1g-dev \
-              autoconf \
-              automake \
-              libtool \
-              pkg-config \
-              cmake \
-              libffi-dev \
-              libssl-dev \
-              wget \
-              curl \
-              && rm -rf /var/lib/apt/lists/*
-
-            # 安装 Buildozer 和依赖
-            pip3 install --upgrade pip
-            pip3 install buildozer cython==0.29.33
-
+          --user $(id -u):$(id -g) \
+          kivy/kivy:android /bin/bash -c "
+            # 更新 pip 并安装 Buildozer
+            pip install --upgrade pip
+            pip install buildozer
+            
+            # 设置环境变量
+            export PATH=\$PATH:/home/user/.local/bin
+            
             # 接受 Android SDK 许可证
-            mkdir -p /root/.android
-            yes | /usr/lib/android-sdk/tools/bin/sdkmanager --licenses 2>/dev/null || true
-
+            mkdir -p /home/user/.android
+            echo '8933bad161af4178b1185d1a37fbf41ea5269c55' > /home/user/.android/licenses/android-sdk-license
+            echo '84831b9409646a918e30573bab4c9c91346d8abd' > /home/user/.android/licenses/android-sdk-preview-license
+            
             # 开始构建
             buildozer -v android debug
           "
