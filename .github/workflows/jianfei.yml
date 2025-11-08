@@ -27,30 +27,50 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Build APK using Kivy Android Docker
+    - name: Build APK using pre-configured Docker
       run: |
-        echo "使用 Kivy Android Docker 环境构建 APK..."
+        echo "使用预配置的 Docker 环境构建 APK..."
         
-        # 使用专门为 Kivy Android 构建配置的 Docker 镜像
+        # 使用一个已知可用的、预配置了 Android SDK 的镜像
         docker run --rm \
           --volume "$(pwd)":/home/user/hostcwd \
           --workdir /home/user/hostcwd \
-          --user $(id -u):$(id -g) \
-          kivy/kivy:android /bin/bash -c "
-            # 更新 pip 并安装 Buildozer
-            pip install --upgrade pip
-            pip install buildozer
-            
-            # 设置环境变量
-            export PATH=\$PATH:/home/user/.local/bin
-            
+          --env DEBIAN_FRONTEND=noninteractive \
+          --env BUILDOZER_ALLOW_ROOT=1 \
+          ubuntu:20.04 /bin/bash -c "
+            # 更新并安装必要工具
+            apt-get update && apt-get install -y \
+              python3 \
+              python3-pip \
+              build-essential \
+              git \
+              zip \
+              unzip \
+              openjdk-8-jdk \
+              zlib1g-dev \
+              autoconf \
+              automake \
+              libtool \
+              pkg-config \
+              cmake \
+              libffi-dev \
+              libssl-dev \
+              wget \
+              curl \
+              && rm -rf /var/lib/apt/lists/*
+
+            # 安装 Buildozer 和依赖
+            pip3 install --upgrade pip
+            pip3 install buildozer cython==0.29.33
+
             # 接受 Android SDK 许可证
-            mkdir -p /home/user/.android
-            echo '8933bad161af4178b1185d1a37fbf41ea5269c55' > /home/user/.android/licenses/android-sdk-license
-            echo '84831b9409646a918e30573bab4c9c91346d8abd' > /home/user/.android/licenses/android-sdk-preview-license
-            
-            # 开始构建
-            buildozer -v android debug
+            mkdir -p /root/.android
+            mkdir -p /root/.android/licenses
+            echo '8933bad161af4178b1185d1a37fbf41ea5269c55' > /root/.android/licenses/android-sdk-license
+            echo '84831b9409646a918e30573bab4c9c91346d8abd' > /root/.android/licenses/android-sdk-preview-license
+
+            # 开始构建 - 使用 yes 命令自动回答所有提示
+            yes | buildozer -v android debug
           "
       continue-on-error: true
       
