@@ -36,7 +36,7 @@ bootstraps = sdl2
 android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
 
 # 应用图标（需要准备不同尺寸的图标）
-# icon.filename = %(source.dir)s/data/icon.png
+icon.filename = %(source.dir)s/data/icon.png
 
 # 预设配置
 preset.filename = %(source.dir)s/buildozer_preset.py
@@ -51,4 +51,5 @@ source.include_patterns = fonts/*.ttf
 # 日志级别
 log_level = 2
 # 创建调试版本
+
 warn_on_root = 1
