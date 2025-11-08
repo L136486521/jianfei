@@ -84,16 +84,23 @@ jobs:
         unzip -q cmdline-tools.zip
         rm cmdline-tools.zip
         
-        # 创建正确的目录结构
-        mkdir -p cmdline-tools/latest
-        mv cmdline-tools/* cmdline-tools/latest/
-        rmdir cmdline-tools
+        # 修复目录结构问题
+        # 解压后通常会有 cmdline-tools 目录，我们需要将其重命名为正确的结构
+        if [ -d "cmdline-tools" ]; then
+          mv cmdline-tools temp-cmdline
+          mkdir -p cmdline-tools
+          mv temp-cmdline cmdline-tools/latest
+        else
+          # 如果解压后没有 cmdline-tools 目录，创建正确的结构
+          mkdir -p cmdline-tools/latest
+          mv tools/* cmdline-tools/latest/ 2>/dev/null || true
+        fi
         
-        # 设置环境变量
+        echo "安装 Build-Tools..."
+        # 设置环境变量用于 sdkmanager
         export ANDROID_SDK_ROOT=$SDK_DIR
         export PATH=$SDK_DIR/cmdline-tools/latest/bin:$PATH
         
-        echo "安装 Build-Tools..."
         # 安装 build-tools (包含 aidl)
         yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "build-tools;34.0.0"
         
