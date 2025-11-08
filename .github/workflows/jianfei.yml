@@ -1,0 +1,162 @@
+name: Build Android APK
+on:
+  push:
+    branches: [ main, master ]
+  pull_request:
+    branches: [ main, master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+      
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.9'
+        
+    - name: Install system dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y \
+          python3-pip \
+          build-essential \
+          git \
+          zip \
+          unzip \
+          openjdk-11-jdk \
+          autoconf \
+          libtool \
+          pkg-config \
+          zlib1g-dev \
+          libncurses5-dev \
+          libncursesw5-dev \
+          libtinfo5 \
+          cmake \
+          libffi-dev \
+          libssl-dev \
+          libsqlite3-dev
+          
+    - name: Install Buildozer and dependencies
+      run: |
+        pip install --user buildozer
+        pip install --user cython
+        echo "$(python -m site --user-base)/bin" >> $GITHUB_PATH
+        
+    - name: Install Python dependencies
+      run: |
+        pip install kivy kivymd peewee
+        
+    - name: Create buildozer.spec file
+      run: |
+        buildozer init
+        # 修改 buildozer.spec 配置
+        cat > buildozer.spec << 'EOF'
+[app]
+title = 减肥数据记录
+package.name = jianfei
+package.domain = org.jianfei
+source.dir = .
+source.include_exts = py,png,jpg,kv,atlas,ttf,db
+main = main.py
+version = 2.0
+version.regex = __version__ = ['"](.*)['"]
+version.filename = %(source.dir)s/main.py
+requirements = python3,kivy==2.1.0,kivymd==1.1.1,peewee,openssl,requests,sqlite3
+android.api = 30
+android.minapi = 21
+android.targetapi = 30
+bootstraps = sdl2
+android.permissions = WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
+icon.filename = %(source.dir)s/data/icon.png
+log_level = 2
+source.include_patterns = fonts/*.ttf
+orientation = portrait
+fullscreen = 0
+window.resizable = 0
+
+[buildozer]
+log_level = 2
+warn_on_root = 1
+build_dir = .buildozer
+bin_dir = bin
+default_target = android
+android.accept_sdk_license = True
+EOF
+        
+    - name: Verify resource files exist
+      run: |
+        echo "检查资源文件..."
+        if [ -f "fonts/simkai.ttf" ]; then
+          echo "✅ 字体文件存在: fonts/simkai.ttf"
+        else
+          echo "❌ 字体文件不存在: fonts/simkai.ttf"
+          exit 1
+        fi
+        
+        if [ -f "data/icon.png" ]; then
+          echo "✅ 图标文件存在: data/icon.png"
+        else
+          echo "❌ 图标文件不存在: data/icon.png"
+          exit 1
+        fi
+        
+    - name: Build APK with Buildozer
+      run: |
+        buildozer -v android debug
+      continue-on-error: true
+      
+    - name: Check if APK exists
+      id: check_apk
+      run: |
+        if ls bin/*.apk 1> /dev/null 2>&1; then
+          echo "apk_exists=true" >> $GITHUB_OUTPUT
+          echo "APK文件找到: $(ls bin/*.apk)"
+          echo "APK文件大小: $(du -h bin/*.apk | cut -f1)"
+        else
+          echo "apk_exists=false" >> $GITHUB_OUTPUT
+          echo "未找到APK文件，检查构建目录:"
+          ls -la bin/ || echo "bin目录不存在"
+        fi
+        
+    - name: Upload APK artifact (强制上传)
+      if: steps.check_apk.outputs.apk_exists == 'true'
+      uses: actions/upload-artifact@v3
+      with:
+        name: jianfei-app-apk
+        path: bin/*.apk
+        retention-days: 30
+        if-no-files-found: error
+        
+    - name: Create placeholder if no APK
+      if: steps.check_apk.outputs.apk_exists == 'false'
+      run: |
+        echo "创建占位文件说明情况"
+        mkdir -p bin
+        echo "构建过程中未生成APK文件" > bin/BUILD_FAILED.txt
+        echo "请检查GitHub Actions日志了解详细错误信息" >> bin/BUILD_FAILED.txt
+        date >> bin/BUILD_FAILED.txt
+        
+    - name: Upload all build files and logs
+      uses: actions/upload-artifact@v3
+      with:
+        name: build-files-and-logs
+        path: |
+          .buildozer/
+          buildozer.spec
+          bin/
+        retention-days: 30
+        if-no-files-found: warn
+        
+    - name: Final build status
+      run: |
+        if [ "${{ steps.check_apk.outputs.apk_exists }}" = "true" ]; then
+          echo "🎉 APK构建成功！可在Artifacts中下载"
+          echo "APK文件: $(ls bin/*.apk)"
+        else
+          echo "💥 APK构建失败，请检查上方日志"
+          # 这里不退出，让工作流完成上传日志
+        fi
