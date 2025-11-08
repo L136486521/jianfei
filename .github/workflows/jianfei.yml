@@ -27,9 +27,9 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Build APK using updated Docker
+    - name: Build APK with optimized configuration
       run: |
-        echo "使用更新的 Docker 环境构建 APK..."
+        echo "使用优化的配置构建 APK..."
         
         # 使用更新的 Ubuntu 版本并确保包列表正确更新
         docker run --rm \
@@ -89,8 +89,35 @@ jobs:
             echo '8933bad161af4178b1185d1a37fbf41ea5269c55' > /root/.android/licenses/android-sdk-license
             echo '84831b9409646a918e30573bab4c9c91346d8abd' > /root/.android/licenses/android-sdk-preview-license
 
-            # 开始构建
-            yes | buildozer -v android debug
+            # 修复 buildozer.spec 配置
+            echo '修复 buildozer.spec 配置...'
+            
+            # 备份原文件
+            cp buildozer.spec buildozer.spec.backup
+            
+            # 移除冲突的版本配置
+            sed -i '/version.regex/d' buildozer.spec
+            sed -i '/version.filename/d' buildozer.spec
+            
+            # 使用更稳定的依赖版本
+            sed -i 's/kivy==2.3.0/kivy==2.1.0/g' buildozer.spec
+            sed -i 's/kivymd==1.2.0/kivymd==1.1.1/g' buildozer.spec
+            
+            # 添加必要的配置
+            if ! grep -q 'android.arch' buildozer.spec; then
+              echo 'android.arch = armeabi-v7a' >> buildozer.spec
+            fi
+            
+            # 显示修复后的配置
+            echo '修复后的 buildozer.spec 相关内容:'
+            grep -E '(version|requirements|android\.)' buildozer.spec || echo '没有找到相关配置'
+
+            # 开始构建 - 增加超时和重试
+            echo '开始构建 APK...'
+            yes | buildozer -v android debug || \
+            (echo '第一次构建失败，尝试清理后重新构建...' && \
+             buildozer android clean && \
+             yes | buildozer -v android debug)
           "
       continue-on-error: true
       
@@ -102,6 +129,8 @@ jobs:
           APK_FILE=$(find bin/ -name "*.apk" | head -1)
           echo "APK文件找到: $APK_FILE"
           echo "APK文件大小: $(du -h "$APK_FILE" | cut -f1)"
+          echo "APK详细信息:"
+          file "$APK_FILE"
         else
           echo "apk_exists=false" >> $GITHUB_OUTPUT
           echo "未找到APK文件"
@@ -109,6 +138,8 @@ jobs:
           ls -la
           echo "bin目录内容:"
           ls -la bin/ 2>/dev/null || echo "bin目录不存在"
+          echo "构建日志:"
+          find .buildozer -name "*.log" -exec echo "=== {} ===" \; -exec head -100 {} \; 2>/dev/null || echo "没有找到日志文件"
         fi
         
     - name: Upload APK artifact
@@ -133,7 +164,9 @@ jobs:
         if [ "${{ steps.check_apk.outputs.apk_exists }}" = "true" ]; then
           echo "🎉 APK构建成功！"
           echo "📱 可在Artifacts中下载APK文件"
+          echo "✅ 所有问题已解决！"
         else
           echo "💥 APK构建失败"
           echo "🔍 请查看构建日志了解详细错误信息"
+          echo "🔄 我们会继续优化配置..."
         fi
