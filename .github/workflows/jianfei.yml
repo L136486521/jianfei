@@ -7,11 +7,11 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     
     steps:
     - name: Checkout code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
       
     - name: Set up Python
       uses: actions/setup-python@v4
@@ -101,9 +101,9 @@ jobs:
           ls -la bin/ || echo "bin目录不存在"
         fi
         
-    - name: Upload APK artifact (强制上传)
+    - name: Upload APK artifact
       if: steps.check_apk.outputs.apk_exists == 'true'
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: jianfei-app-apk
         path: bin/*.apk
@@ -120,7 +120,7 @@ jobs:
         echo "请检查GitHub Actions日志了解详细错误信息" >> bin/build_info.txt
         
     - name: Upload build logs and info
-      uses: actions/upload-artifact@v3
+      uses: actions/upload-artifact@v4
       with:
         name: build-logs
         path: |
