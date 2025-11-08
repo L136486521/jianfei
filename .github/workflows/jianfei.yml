@@ -22,7 +22,7 @@ jobs:
       run: |
         sudo apt-get update
         
-        # 安装基础构建工具
+        # 基础构建工具
         sudo apt-get install -y \
           python3-pip \
           build-essential \
@@ -39,19 +39,17 @@ jobs:
           libssl-dev \
           libsqlite3-dev
         
-        # 安装 ncurses 相关依赖（Ubuntu 24.04 兼容版本）
+        # Ubuntu 24.04 正确的 ncurses 包名
         sudo apt-get install -y \
           libncurses-dev \
-          libncursesw6-dev \
-          libtinfo6
-        
-        # 创建符号链接以兼容旧版本（如果需要）
-        sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5 || true
+          libncursesw-dev \
+          libtinfo-dev
         
     - name: Install Buildozer and dependencies
       run: |
-        pip install --user buildozer
-        pip install --user cython==0.29.33
+        python -m pip install --upgrade pip
+        pip install buildozer
+        pip install cython==0.29.33
         echo "$(python -m site --user-base)/bin" >> $GITHUB_PATH
         
     - name: Verify required files exist
@@ -59,6 +57,8 @@ jobs:
         echo "检查必要文件..."
         if [ -f "buildozer.spec" ]; then
           echo "✅ buildozer.spec 文件存在"
+          echo "文件内容预览:"
+          head -20 buildozer.spec
         else
           echo "❌ buildozer.spec 文件不存在"
           exit 1
@@ -89,9 +89,12 @@ jobs:
         
     - name: Build APK with Buildozer
       run: |
-        # 设置 Buildozer 缓存以避免重复下载
+        # 设置环境变量
         export BUILDODER_CACHE_DIR="$HOME/.buildozer_cache"
         mkdir -p "$BUILDODER_CACHE_DIR"
+        
+        # 清理之前的构建
+        buildozer android clean || true
         
         # 开始构建
         buildozer -v android debug
@@ -100,18 +103,18 @@ jobs:
     - name: Check if APK exists
       id: check_apk
       run: |
-        if ls bin/*.apk 1> /dev/null 2>&1; then
+        if find bin/ -name "*.apk" | grep -q .; then
           echo "apk_exists=true" >> $GITHUB_OUTPUT
-          APK_FILE=$(ls bin/*.apk)
+          APK_FILE=$(find bin/ -name "*.apk" | head -1)
           echo "APK文件找到: $APK_FILE"
-          echo "APK文件大小: $(du -h $APK_FILE | cut -f1)"
+          echo "APK文件大小: $(du -h "$APK_FILE" | cut -f1)"
         else
           echo "apk_exists=false" >> $GITHUB_OUTPUT
           echo "未找到APK文件"
-          # 检查构建目录内容
-          echo "构建目录内容:"
-          ls -la .buildozer/ || echo ".buildozer目录不存在"
-          ls -la bin/ || echo "bin目录不存在"
+          echo "当前目录内容:"
+          ls -la
+          echo "bin目录内容:"
+          ls -la bin/ 2>/dev/null || echo "bin目录不存在"
         fi
         
     - name: Upload APK artifact
@@ -121,16 +124,6 @@ jobs:
         name: jianfei-app-apk
         path: bin/*.apk
         retention-days: 30
-        
-    - name: Create build info file
-      if: steps.check_apk.outputs.apk_exists == 'false'
-      run: |
-        mkdir -p bin
-        echo "构建信息" > bin/build_info.txt
-        echo "==========" >> bin/build_info.txt
-        echo "构建时间: $(date)" >> bin/build_info.txt
-        echo "构建状态: 失败 - 未生成APK文件" >> bin/build_info.txt
-        echo "请检查GitHub Actions日志了解详细错误信息" >> bin/build_info.txt
         
     - name: Upload build logs and info
       uses: actions/upload-artifact@v4
