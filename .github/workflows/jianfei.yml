@@ -21,6 +21,8 @@ jobs:
     - name: Install system dependencies
       run: |
         sudo apt-get update
+        
+        # 安装基础构建工具
         sudo apt-get install -y \
           python3-pip \
           build-essential \
@@ -32,18 +34,24 @@ jobs:
           libtool \
           pkg-config \
           zlib1g-dev \
-          libncurses5-dev \
-          libncursesw5-dev \
-          libtinfo5 \
           cmake \
           libffi-dev \
           libssl-dev \
           libsqlite3-dev
-          
+        
+        # 安装 ncurses 相关依赖（Ubuntu 24.04 兼容版本）
+        sudo apt-get install -y \
+          libncurses-dev \
+          libncursesw6-dev \
+          libtinfo6
+        
+        # 创建符号链接以兼容旧版本（如果需要）
+        sudo ln -sf /usr/lib/x86_64-linux-gnu/libtinfo.so.6 /usr/lib/x86_64-linux-gnu/libtinfo.so.5 || true
+        
     - name: Install Buildozer and dependencies
       run: |
         pip install --user buildozer
-        pip install --user cython
+        pip install --user cython==0.29.33
         echo "$(python -m site --user-base)/bin" >> $GITHUB_PATH
         
     - name: Verify required files exist
@@ -81,6 +89,11 @@ jobs:
         
     - name: Build APK with Buildozer
       run: |
+        # 设置 Buildozer 缓存以避免重复下载
+        export BUILDODER_CACHE_DIR="$HOME/.buildozer_cache"
+        mkdir -p "$BUILDODER_CACHE_DIR"
+        
+        # 开始构建
         buildozer -v android debug
       continue-on-error: true
       
