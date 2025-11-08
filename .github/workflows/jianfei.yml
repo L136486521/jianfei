@@ -69,11 +69,9 @@ jobs:
         
     - name: Build APK with Buildozer
       run: |
-        # 先检查配置
-        buildozer check
-        echo "配置检查完成，开始构建..."
+        echo "开始构建APK..."
         
-        # 构建APK
+        # 直接构建APK，跳过不存在的check命令
         buildozer -v android debug
       continue-on-error: true
       
