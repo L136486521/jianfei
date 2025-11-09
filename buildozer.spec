@@ -28,7 +28,7 @@ source.include_exts = py,png,jpg,kv,atlas,ttf,db
 #source.exclude_patterns = license,images/*/*.jpg
 
 # (str) Application versioning (method 1)
-version = 2.0
+version = 1.0
 
 # (str) Application versioning (method 2)
 # version.regex = __version__ = ['"](.*)['"]
@@ -64,7 +64,7 @@ orientation = portrait
 # author = © Copyright Info
 
 # (str) App copyright info
-copyright = Copyright © 2025 减肥数据记录
+copyright = Copyright © 2023 减肥数据记录
 
 # (str) App description
 #description = 
@@ -105,7 +105,7 @@ android.minapi = 21
 android.sdk = 21
 
 # (str) Android NDK version to use
-android.ndk = 23b
+android.ndk = 25b
 
 # (int) Android NDK API to use. This is the minimum API your app will support, it should usually match android.minapi.
 android.ndk_api = 21
