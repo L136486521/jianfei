@@ -60,22 +60,26 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Setup Android SDK environment
+    - name: Setup Android NDK 25
       run: |
-        echo "设置 Android SDK 环境..."
+        echo "设置 Android NDK 25..."
         
-        # 设置环境变量
-        export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-        export PATH=$JAVA_HOME/bin:$PATH
+        # 删除旧的 NDK 23
+        rm -rf ~/.buildozer/android/platform/android-ndk-r23b
         
-        # 接受 Android SDK 许可证
-        mkdir -p ~/.android/licenses
-        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
-        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
-        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
+        # 下载并安装 NDK 25b
+        NDK_URL="https://dl.google.com/android/repository/android-ndk-r25b-linux.zip"
+        NDK_DIR="$HOME/.buildozer/android/platform"
         
-        echo "Android SDK 环境设置完成"
+        mkdir -p $NDK_DIR
+        cd $NDK_DIR
+        
+        # 下载 NDK 25b
+        wget -q $NDK_URL -O android-ndk-r25b.zip
+        unzip -q android-ndk-r25b.zip
+        rm android-ndk-r25b.zip
+        
+        echo "Android NDK 25b 安装完成"
         
     - name: Build APK with Buildozer
       run: |
@@ -83,7 +87,8 @@ jobs:
         
         # 设置环境变量
         export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-        export PATH=$JAVA_HOME/bin:$PATH
+        export ANDROID_NDK_HOME="$HOME/.buildozer/android/platform/android-ndk-r25b"
+        export PATH=$JAVA_HOME/bin:$ANDROID_NDK_HOME:$PATH
         
         # 清理之前的构建
         buildozer android clean || true
