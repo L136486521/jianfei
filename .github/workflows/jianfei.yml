@@ -42,9 +42,9 @@ jobs:
         
     - name: Install Buildozer and requirements
       run: |
-        pip install buildozer
+        pip install buildozer==1.5.0
         pip install cython==0.29.33
-        pip install kivy==2.1.0 kivymd==1.1.1 peewee
+        pip install kivy==2.1.0 kivymd==1.1.1 peewee==3.14.4
         
     - name: Verify required files exist
       run: |
@@ -60,19 +60,13 @@ jobs:
         done
         echo "所有必要文件检查通过！"
         
-    - name: Initialize Buildozer and install Android SDK tools
+    - name: Setup Android SDK environment
       run: |
-        echo "初始化 Buildozer 并安装 Android SDK 工具..."
+        echo "设置 Android SDK 环境..."
         
         # 设置环境变量
         export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
         export PATH=$JAVA_HOME/bin:$PATH
-        
-        # 初始化 Buildozer（这会创建 .buildozer 目录）
-        buildozer init || true
-        
-        # 确保 Buildozer 的 Android SDK 目录存在
-        mkdir -p ~/.buildozer/android/platform/android-sdk
         
         # 接受 Android SDK 许可证
         mkdir -p ~/.android/licenses
@@ -81,50 +75,7 @@ jobs:
         echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
         
-        # 下载并安装 Android SDK 命令行工具到 Buildozer 的目录
-        SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
-        cd $SDK_DIR
-        
-        # 下载命令行工具
-        wget -q https://dl.google.com/android/repository/commandlinetools-linux-9477386_latest.zip -O cmdline-tools.zip
-        unzip -q cmdline-tools.zip
-        rm cmdline-tools.zip
-        
-        # 创建正确的目录结构
-        mkdir -p cmdline-tools
-        mv tools cmdline-tools/latest
-        
-        # 设置环境变量
-        export ANDROID_SDK_ROOT=$SDK_DIR
-        export PATH=$SDK_DIR/cmdline-tools/latest/bin:$PATH
-        
-        echo "安装 Build-Tools (包含 aidl)..."
-        # 安装 build-tools
-        yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "build-tools;34.0.0"
-        
-        echo "安装 Platform Tools..."
-        yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platform-tools"
-        
-        echo "安装 Android Platform..."
-        yes | sdkmanager --sdk_root=$ANDROID_SDK_ROOT "platforms;android-34"
-        
-        echo "Android SDK 工具安装完成"
-        
-    - name: Verify AIDL tool exists
-      run: |
-        echo "验证 AIDL 工具是否存在..."
-        SDK_DIR="$HOME/.buildozer/android/platform/android-sdk"
-        
-        # 查找 aidl 工具
-        if find $SDK_DIR -name "aidl" -type f 2>/dev/null | grep -q .; then
-          echo "✅ AIDL 工具已找到:"
-          find $SDK_DIR -name "aidl" -type f
-        else
-          echo "❌ AIDL 工具未找到"
-          echo "检查 build-tools 目录:"
-          ls -la $SDK_DIR/build-tools/ || echo "build-tools 目录不存在"
-          exit 1
-        fi
+        echo "Android SDK 环境设置完成"
         
     - name: Build APK with Buildozer
       run: |
@@ -132,14 +83,13 @@ jobs:
         
         # 设置环境变量
         export JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64
-        export ANDROID_SDK_ROOT="$HOME/.buildozer/android/platform/android-sdk"
-        export PATH=$JAVA_HOME/bin:$ANDROID_SDK_ROOT/cmdline-tools/latest/bin:$ANDROID_SDK_ROOT/platform-tools:$PATH
+        export PATH=$JAVA_HOME/bin:$PATH
         
         # 清理之前的构建
         buildozer android clean || true
         
         echo "开始正式构建..."
-        # 使用更长的超时时间
+        # 使用超时机制
         timeout 3600 buildozer -v android debug
       continue-on-error: true
       
