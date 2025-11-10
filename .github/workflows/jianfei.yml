@@ -7,7 +7,7 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-22.04  # 使用更稳定的 Ubuntu 22.04
+    runs-on: ubuntu-22.04
     
     steps:
     - name: Checkout code
@@ -41,29 +41,6 @@ jobs:
         pip install buildozer==1.5.0
         pip install cython==0.29.33
         pip install kivy==2.1.0 kivymd==1.1.1 peewee==3.14.4
-        
-    - name: Create minimal buildozer.spec
-      run: |
-        cat > buildozer.spec << 'EOF'
-[app]
-title = 减肥数据记录
-package.name = jianfei
-package.domain = org.example
-source.dir = .
-source.include_exts = py,png,jpg,kv,atlas,ttf,db
-version = 1.0
-requirements = python3,kivy==2.1.0,kivymd==1.1.1,peewee==3.14.4,android,sqlite3
-orientation = portrait
-fullscreen = 0
-android.permissions = INTERNET,WRITE_EXTERNAL_STORAGE,READ_EXTERNAL_STORAGE
-android.api = 31
-android.minapi = 21
-android.sdk = 21
-android.ndk = 25b
-android.ndk_api = 21
-android.accept_sdk_license = True
-buildozer.log_level = 2
-EOF
         
     - name: Build APK
       run: |
