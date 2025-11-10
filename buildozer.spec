@@ -28,10 +28,10 @@ source.include_exts = py,png,jpg,kv,atlas,ttf,db
 #source.exclude_patterns = license,images/*/*.jpg
 
 # (str) Application versioning (method 1)
-version = 2.0
+version = 1.0
 
 # (list) Application requirements
-requirements = python3,kivy==2.1.0,kivymd==1.1.1,peewee==3.14.4,sqlite3,android
+requirements = python3,kivy==2.1.0,kivymd==1.1.1,peewee==3.14.4,android,sqlite3
 
 # (str) Custom source folders for requirements
 # Sets custom source for any requirements with recipes
@@ -53,7 +53,7 @@ orientation = portrait
 #services = NAME:ENTRYPOINT_TO_PY,NAME2:ENTRYPOINT2_TO_PY
 
 # (str) App copyright info
-copyright = Copyright © 2025 减肥数据记录
+copyright = Copyright © 2023 减肥数据记录
 
 # (str) Android logcat filters (by default use logcat level method: *:S myapp:D)
 #logcat_filters = *:S python:D
@@ -110,7 +110,3 @@ buildozer.build_dir = bin
 
 # (int) Log level (0 = error only, 1 = info, 2 = debug (with command output))
 buildozer.log_level = 2
-
-# (list) List of build options to use
-# For example, to ignore a certain requirement during the build:
-#buildozer.build_options = ["--ignore-requirements=python3,kivy"]
