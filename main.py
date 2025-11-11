@@ -21,10 +21,31 @@ from peewee import SqliteDatabase, Model, TextField, DateTimeField, AutoField, D
 from datetime import datetime, date, timedelta
 from kivy.metrics import dp
 import sys
-import csv  # 添加这一行
+import csv
 import math
 
-DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
+# 修复Android模块导入
+try:
+    from kivy import platform
+    if platform == 'android':
+        from android.storage import app_storage_path, primary_external_storage_path
+        from android.permissions import request_permissions, Permission
+        # 请求存储权限
+        request_permissions([Permission.WRITE_EXTERNAL_STORAGE, Permission.READ_EXTERNAL_STORAGE])
+        ANDROID = True
+    else:
+        ANDROID = False
+except ImportError:
+    ANDROID = False
+    print("非Android环境，跳过Android模块导入")
+
+# 设置数据库路径
+if ANDROID:
+    DB_DIR = app_storage_path()
+    DB_PATH = os.path.join(DB_DIR, "data.db")
+else:
+    DB_PATH = os.path.join(os.path.dirname(__file__), "data.db")
+
 db = SqliteDatabase(DB_PATH)
 
 
@@ -102,23 +123,26 @@ def _ensure_datetime(obj):
 
 
 def init_db():
-    db.connect(reuse_if_open=True)
-    db.create_tables([Entry])
-    cursor = db.execute_sql("PRAGMA table_info(entry);")
-    cols = [row[1] for row in cursor.fetchall()]
-    if "date" not in cols:
-        db.execute_sql("ALTER TABLE entry ADD COLUMN date TEXT;")
-        try:
-            db.execute_sql("UPDATE entry SET date = date(created_at) WHERE date IS NULL;")
-        except Exception:
-            pass
-    if "period" not in cols:
-        db.execute_sql("ALTER TABLE entry ADD COLUMN period TEXT;")
-        db.execute_sql("UPDATE entry SET period = 'morning' WHERE period IS NULL;")
+    try:
+        db.connect(reuse_if_open=True)
+        db.create_tables([Entry])
+        cursor = db.execute_sql("PRAGMA table_info(entry);")
+        cols = [row[1] for row in cursor.fetchall()]
+        if "date" not in cols:
+            db.execute_sql("ALTER TABLE entry ADD COLUMN date TEXT;")
+            try:
+                db.execute_sql("UPDATE entry SET date = date(created_at) WHERE date IS NULL;")
+            except Exception:
+                pass
+        if "period" not in cols:
+            db.execute_sql("ALTER TABLE entry ADD COLUMN period TEXT;")
+            db.execute_sql("UPDATE entry SET period = 'morning' WHERE period IS NULL;")
+    except Exception as e:
+        print(f"数据库初始化错误: {e}")
 
 
 def setup_chinese_font():
-    """设置中文字体支持：简化版本，只注册中文字体，不覆盖系统字体"""
+    """设置中文字体支持：采用成功版本的完整方法"""
     try:
         candidates = [
             os.path.join(os.path.dirname(__file__), "fonts", "simkai.ttf"),
@@ -512,7 +536,10 @@ class TrendChart(Widget):
 class MainScreen(MDScreen):
     def __init__(self, **kwargs):
         super().__init__(**kwargs)
+        Clock.schedule_once(self._finish_init, 0.1)  # 延迟初始化UI组件
 
+    def _finish_init(self, dt):
+        """延迟初始化UI组件"""
         # 主布局
         layout = MDBoxLayout(orientation="vertical", spacing=10, padding=10)
 
@@ -536,7 +563,7 @@ class MainScreen(MDScreen):
         )
         self.left_icon.bind(on_release=lambda x: self.open_menu(x))
 
-        # 中间标题
+        # 中间标题 - 强制使用中文字体
         self.title_label = MDLabel(
             text="减肥数据记录",
             halign="center",
@@ -562,7 +589,7 @@ class MainScreen(MDScreen):
 
         layout.add_widget(top_bar)
 
-        # 下拉菜单
+        # 下拉菜单 - 强制使用中文字体
         self.menu = MDDropdownMenu(
             caller=self.left_icon,
             items=[
@@ -600,7 +627,7 @@ class MainScreen(MDScreen):
             width_mult=4,
         )
 
-        # 按钮区域
+        # 按钮区域 - 强制使用中文字体
         button_layout = MDBoxLayout(orientation="horizontal", spacing=10, size_hint_y=None, height=dp(60))
         self.add_morning_btn = MDRaisedButton(text="记录早晨体重", size_hint_x=0.5, font_name="ChineseFont")
         self.add_evening_btn = MDRaisedButton(text="记录晚间体重", size_hint_x=0.5, font_name="ChineseFont")
@@ -618,6 +645,9 @@ class MainScreen(MDScreen):
 
         self.add_widget(layout)
         self._dialog = None
+        
+        # 刷新列表
+        self.refresh_list()
 
     def open_menu(self, instance):
         self.menu.open()
@@ -655,7 +685,7 @@ class MainScreen(MDScreen):
                 size_hint_x=None,
                 width=dp(70),
                 font_name="ChineseFont",
-                md_bg_color=(0.2, 0.6, 0.8, 1) if months == 1 else (0.5, 0.5, 0.5, 1)  # 修复按钮颜色
+                md_bg_color=(0.2, 0.6, 0.8, 1) if months == 1 else (0.5, 0.5, 0.5, 1)
             )
             btn.months = months
             btn.bind(on_release=lambda x: self.update_chart_range(x.months))
@@ -695,7 +725,9 @@ class MainScreen(MDScreen):
             ],
             size_hint=(0.95, 0.9)
         )
-        self.trend_dialog.ids.title.font_name = "ChineseFont"
+        # 设置对话框标题的字体
+        if hasattr(self.trend_dialog, 'ids') and 'title' in self.trend_dialog.ids:
+            self.trend_dialog.ids.title.font_name = "ChineseFont"
         self.trend_dialog.open()
 
     def update_chart_range(self, months):
@@ -743,11 +775,21 @@ class MainScreen(MDScreen):
         return chart_data
 
     def export_data_to_csv(self):
-        """导出历史数据到 CSV 文件（时段使用中文，时间到分钟，使用 UTF-8 BOM）"""
+        """导出历史数据到 CSV 文件"""
         try:
+            if ANDROID:
+                from android.storage import primary_external_storage_path
+                export_dir = primary_external_storage_path()
+                out_path = os.path.join(export_dir, "Download", "weight_data.csv")
+            else:
+                out_path = os.path.abspath("weight_data.csv")
+                
             entries = Entry.select().order_by(Entry.date.desc(), Entry.period.asc(), Entry.created_at.desc())
             period_map = {"morning": "早晨", "evening": "晚间"}
-            out_path = os.path.abspath("weight_data.csv")
+            
+            # 确保目录存在
+            os.makedirs(os.path.dirname(out_path), exist_ok=True)
+            
             with open(out_path, mode="w", newline="", encoding="utf-8-sig") as file:
                 writer = csv.writer(file)
                 writer.writerow(["日期", "时段", "体重", "创建时间"])
@@ -764,13 +806,20 @@ class MainScreen(MDScreen):
             self._show_error(f"导出失败: {e}")
 
     def import_data_from_csv(self):
-        """从 CSV 文件导入历史数据（兼容中文/英文时段，支持创建时间到分钟），对已存在记录进行更新"""
+        """从 CSV 文件导入历史数据"""
         try:
-            in_path = os.path.abspath("weight_data.csv")
+            if ANDROID:
+                from android.storage import primary_external_storage_path
+                import_dir = primary_external_storage_path()
+                in_path = os.path.join(import_dir, "Download", "weight_data.csv")
+            else:
+                in_path = os.path.abspath("weight_data.csv")
+                
             if not os.path.exists(in_path):
-                self._show_error("未找到 weight_data.csv 文件")
+                self._show_error(f"未找到文件: {in_path}")
                 return
-            # 支持中文和英文时段映射（对大小写及全角/半角空白容错）
+                
+            # 支持中文和英文时段映射
             rev_map = {
                 "早晨": "morning", "早上": "morning", "早": "morning", "morning": "morning",
                 "晚间": "evening", "晚上": "evening", "晚": "evening", "evening": "evening"
@@ -803,10 +852,9 @@ class MainScreen(MDScreen):
                     period_key = period_raw.strip()
                     period_value = None
                     if period_key:
-                        # 先直接匹配中文/英文原样，再匹配小写
                         period_value = rev_map.get(period_key) or rev_map.get(period_key.lower()) or period_key.lower()
 
-                    # 解析体重（保留两位小数字符串）
+                    # 解析体重
                     weight_value = None
                     if weight_raw:
                         try:
@@ -816,15 +864,14 @@ class MainScreen(MDScreen):
                             weight_value = None
 
                     if not (date_value and period_value and weight_value):
-                        # 跳过不完整或无法解析的行
                         continue
 
-                    # 解析创建时间（可选）
+                    # 解析创建时间
                     created_dt = None
                     if created_raw:
                         created_dt = _ensure_datetime(created_raw)
 
-                    # upsert：同日期+时段则更新，否则创建
+                    # upsert
                     try:
                         with db.atomic():
                             existing = Entry.get_or_none((Entry.date == date_value) & (Entry.period == period_value))
@@ -847,7 +894,6 @@ class MainScreen(MDScreen):
                                 Entry.create(**kwargs)
                             created_count += 1
                     except Exception:
-                        # 单行失败则跳过，继续导入其他行
                         continue
 
             self.refresh_list()
@@ -896,7 +942,8 @@ class MainScreen(MDScreen):
             buttons=[MDFlatButton(text="确定", on_release=lambda *a: d.dismiss(), font_name="ChineseFont")]
         )
         # 设置对话框标题的字体
-        d.ids.title.font_name = "ChineseFont"
+        if hasattr(d, 'ids') and 'title' in d.ids:
+            d.ids.title.font_name = "ChineseFont"
         d.open()
 
     def show_detailed_history(self):
@@ -911,19 +958,17 @@ class MainScreen(MDScreen):
 
         # 计算需要的高度
         rows = max(len(grouped), 1)
-        # 设置最大高度，确保可以滚动
         max_h = dp(600)
         list_height = dp(48) * rows
         scroll_h = min(list_height, max_h)
 
         content = MDBoxLayout(orientation="vertical", spacing=10, padding=10, size_hint_y=None)
-        # 设置内容高度为列表实际高度
         content.height = scroll_h + dp(20)
         
         scroll = MDScrollView(size_hint=(1, 1))
         history_list = MDList()
         history_list.size_hint_y = None
-        history_list.height = list_height  # 列表高度为实际内容高度
+        history_list.height = list_height
 
         for d in sorted(grouped.keys(), reverse=True):
             if isinstance(d, date):
@@ -960,11 +1005,12 @@ class MainScreen(MDScreen):
             buttons=[MDFlatButton(text="关闭", on_release=lambda *a: d.dismiss(), font_name="ChineseFont")]
         )
         # 设置对话框标题的字体
-        d.ids.title.font_name = "ChineseFont"
+        if hasattr(d, 'ids') and 'title' in d.ids:
+            d.ids.title.font_name = "ChineseFont"
         d.open()
 
     def show_statistics(self):
-        """显示全部记录的数据统计（不再限制为最近30天）"""
+        """显示全部记录的数据统计"""
         entries = [e for e in Entry.select() if e.value]
         if not entries:
             stats_text = "当前没有体重记录数据。"
@@ -990,7 +1036,8 @@ class MainScreen(MDScreen):
             buttons=[MDFlatButton(text="关闭", on_release=lambda *a: d.dismiss(), font_name="ChineseFont")]
         )
         # 设置对话框标题的字体
-        d.ids.title.font_name = "ChineseFont"
+        if hasattr(d, 'ids') and 'title' in d.ids:
+            d.ids.title.font_name = "ChineseFont"
         d.open()
 
     @mainthread
@@ -1032,12 +1079,24 @@ class MainScreen(MDScreen):
             self.list_view.add_widget(row)
 
     def open_weight_dialog(self, period):
+        # 使用标准MDTextField但确保字体设置
         tf = MDTextField(
             hint_text="输入体重（斤），例如 70 或 70.5",
             required=True,
             input_filter="float",
             font_name="ChineseFont"
         )
+        
+        # 延迟设置提示文本字体
+        def set_hint_font(dt):
+            try:
+                if hasattr(tf, '_hint_lbl') and tf._hint_lbl:
+                    tf._hint_lbl.font_name = "ChineseFont"
+            except Exception as e:
+                print(f"设置提示文本字体失败: {e}")
+        
+        Clock.schedule_once(set_hint_font, 0.1)
+        
         content = MDBoxLayout(orientation="vertical", spacing=10, padding=10, size_hint_y=None, height=dp(80))
         content.add_widget(tf)
         title = "记录今日体重（早晨）" if period == "morning" else "记录今日体重（晚间）"
@@ -1074,7 +1133,8 @@ class MainScreen(MDScreen):
             ],
         )
         # 设置对话框标题的字体
-        self._dialog.ids.title.font_name = "ChineseFont"
+        if hasattr(self._dialog, 'ids') and 'title' in self._dialog.ids:
+            self._dialog.ids.title.font_name = "ChineseFont"
         self._dialog.open()
 
     def _show_error(self, msg):
@@ -1084,7 +1144,8 @@ class MainScreen(MDScreen):
             buttons=[MDFlatButton(text="确定", on_release=lambda *a: d.dismiss(), font_name="ChineseFont")]
         )
         # 设置对话框标题的字体
-        d.ids.title.font_name = "ChineseFont"
+        if hasattr(d, 'ids') and 'title' in d.ids:
+            d.ids.title.font_name = "ChineseFont"
         d.open()
 
     def save_weight(self, period, weight):
