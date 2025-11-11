@@ -48,40 +48,47 @@ jobs:
         pip install cython==0.29.33
         pip install kivy==2.1.0 kivymd==1.1.1 peewee==3.14.4
         
-    - name: Initialize Buildozer and accept licenses
+    - name: Pre-accept Android SDK licenses
       run: |
-        # 初始化buildozer环境
-        buildozer init
-        # 预先创建许可证目录
-        mkdir -p ~/.android
+        # 预先创建许可证目录并设置所有已知许可证
         mkdir -p ~/.android/licenses
         
-        # 使用expect自动接受所有许可证
-        expect -c "
-        set timeout 300
-        spawn buildozer android debug
-        expect {
-            \"Do you accept the license\" { exp_send \"y\r\"; exp_continue }
-            \"y/N\" { exp_send \"y\r\"; exp_continue }
-            \"Accept? (y/N):\" { exp_send \"y\r\"; exp_continue }
-            eof
-        }
-        " || true
-        
-        # 如果expect失败，手动停止进程并继续
-        pkill -f buildozer || true
-        sleep 10
-        
-    - name: Build APK with pre-accepted licenses
-      run: |
-        # 设置已知的许可证
+        # 设置多个已知的 Android SDK 许可证哈希
         echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
         echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
         echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
         echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
+        echo "601085b94cd77f0b54ff86406957099ebe79c4d6" >> ~/.android/licenses/android-sdk-preview-license
         
-        echo "开始正式构建 APK..."
-        buildozer -v android debug
+        # 显示设置的许可证
+        echo "已设置的许可证:"
+        cat ~/.android/licenses/*
+        
+    - name: Build APK with license handling
+      run: |
+        echo "开始构建 APK..."
+        
+        # 使用 expect 自动处理构建过程中的交互
+        expect -c "
+        set timeout 1800
+        spawn buildozer -v android debug
+        expect {
+            \"Accept? (y/N):\" { exp_send \"y\r\"; exp_continue }
+            \"y/N\" { exp_send \"y\r\"; exp_continue }
+            \"Do you accept the license\" { exp_send \"y\r\"; exp_continue }
+            \"yes/no\" { exp_send \"yes\r\"; exp_continue }
+            eof
+        }
+        "
+        
+        # 检查是否构建成功
+        if [ -f bin/*.apk ]; then
+          echo "APK 构建成功!"
+          ls -la bin/
+        else
+          echo "APK 构建失败，尝试直接构建..."
+          buildozer -v android debug
+        fi
       timeout-minutes: 120
       
     - name: Upload APK
