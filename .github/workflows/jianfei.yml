@@ -49,10 +49,15 @@ jobs:
         
     - name: Build APK
       run: |
-        # 接受许可证
-        mkdir -p ~/.android/licenses
-        echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
-        echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
+        # 设置 Android SDK 路径并接受所有许可证
+        export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+        
+        # 等待 SDK 初始化后接受许可证
+        echo "等待 Android SDK 初始化..."
+        sleep 30
+        
+        # 接受所有许可证
+        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
         
         echo "开始构建 APK..."
         buildozer -v android debug
