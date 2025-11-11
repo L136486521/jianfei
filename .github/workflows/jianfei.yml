@@ -38,8 +38,9 @@ jobs:
           libssl-dev \
           wget \
           curl \
-          libltdl-dev
-          
+          libltdl-dev \
+          expect
+        
     - name: Install Buildozer and dependencies
       run: |
         pip install --upgrade pip
@@ -47,26 +48,41 @@ jobs:
         pip install cython==0.29.33
         pip install kivy==2.1.0 kivymd==1.1.1 peewee==3.14.4
         
-    - name: Build APK
+    - name: Initialize Buildozer and accept licenses
       run: |
-        # 接受许可证
+        # 初始化buildozer环境
+        buildozer init
+        # 预先创建许可证目录
+        mkdir -p ~/.android
         mkdir -p ~/.android/licenses
+        
+        # 使用expect自动接受所有许可证
+        expect -c "
+        set timeout 300
+        spawn buildozer android debug
+        expect {
+            \"Do you accept the license\" { exp_send \"y\r\"; exp_continue }
+            \"y/N\" { exp_send \"y\r\"; exp_continue }
+            \"Accept? (y/N):\" { exp_send \"y\r\"; exp_continue }
+            eof
+        }
+        " || true
+        
+        # 如果expect失败，手动停止进程并继续
+        pkill -f buildozer || true
+        sleep 10
+        
+    - name: Build APK with pre-accepted licenses
+      run: |
+        # 设置已知的许可证
         echo "8933bad161af4178b1185d1a37fbf41ea5269c55" > ~/.android/licenses/android-sdk-license
         echo "84831b9409646a918e30573bab4c9c91346d8abd" > ~/.android/licenses/android-sdk-preview-license
-
-        # 设置 Android SDK 路径并接受所有许可证
-        export ANDROID_SDK_ROOT=$HOME/.buildozer/android/platform/android-sdk
+        echo "d56f5187479451eabf01fb78af6dfcb131a6481e" >> ~/.android/licenses/android-sdk-license
+        echo "24333f8a63b6825ea9c5514f83c2829b004d1fee" >> ~/.android/licenses/android-sdk-license
         
-        # 等待 SDK 初始化后接受许可证
-        echo "等待 Android SDK 初始化..."
-        sleep 30
-        
-        # 接受所有许可证
-        yes | $ANDROID_SDK_ROOT/cmdline-tools/latest/bin/sdkmanager --licenses || true
-        
-        echo "开始构建 APK..."
+        echo "开始正式构建 APK..."
         buildozer -v android debug
-      timeout-minutes: 90
+      timeout-minutes: 120
       
     - name: Upload APK
       uses: actions/upload-artifact@v4
