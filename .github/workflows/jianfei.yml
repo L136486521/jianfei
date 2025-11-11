@@ -56,7 +56,7 @@ jobs:
         
         echo "开始构建 APK..."
         buildozer -v android debug
-      timeout-minutes: 60
+      timeout-minutes: 90
       
     - name: Upload APK
       uses: actions/upload-artifact@v4
